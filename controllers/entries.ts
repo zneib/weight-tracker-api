@@ -1,3 +1,4 @@
+import { Request } from "https://deno.land/std@0.152.0/http/negotiation";
 import { MongoClient, ObjectId } from "https://deno.land/x/atlas_sdk@v1.1.1/mod.ts";
 const data_api_key = Deno.env.get("DATA_API_KEY");
 
@@ -14,12 +15,68 @@ const client = new MongoClient({
 const db = client.database("workouts-db");
 const workouts = db.collection("workouts");
 
-const addWorkouts = async({request, response}: {request: any; response: any}) => {
-  // Stuff goes here
+interface Response {
+  status: number;
+  body: {
+    success: boolean,
+    msg?: string
+    data?: {
+      workout: any | undefined
+    }
+    insertedId?: {
+      _id: ObjectId,
+      workout: any | undefined
+    }
+  }
 }
 
-const getWorkouts = async({request, response}: {request: any; response: any}) => {
-  // Stuff goes here
+const addWorkouts = async({request, response}: {request: Request; response: Response}) => {
+  try {
+    if (!request.hasBody) {
+      response.status = 400;
+      response.body = {
+        success: false,
+        msg: "No Data"
+      }
+    } else {
+      const body = await request.body();
+      const workout = await JSON.parse(body.value);
+      const insertedId = await workouts.insertOne({
+        _id: new ObjectId(),
+        workout
+      });
+
+      response.status = 201;
+      response.body = {
+        success: true,
+        data: workout,
+        insertedId
+      }
+    }
+  } catch (error) {
+    response.body = {
+      success: false,
+      msg: error.toString(),
+    }
+  }
+}
+
+const getWorkouts = async({response}: {response: Response}) => {
+  try {
+    const foundWorkouts = await workouts.find();
+    if (foundWorkouts) {
+      response.status = 200;
+      response.body = {
+        success: true,
+        data: foundWorkouts
+      }
+    }
+  } catch (error) {
+    response.body = {
+      success: false,
+      msg: error.toString(),
+    }
+  }
 }
 
 export { addWorkouts, getWorkouts}
